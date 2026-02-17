@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.env
+*.log
+*.tar
+models/qwen2.5/
+models/calibrations/
+bdd100k_images_100k/
+bdd100k_labels/
+logs/
+.streamlit/
+.DS_Store
+Thumbs.db
