@@ -14,3 +14,4 @@ logs/
 .streamlit/
 .DS_Store
 Thumbs.db
+calibration_pipeline/*/final_detections/*.json
