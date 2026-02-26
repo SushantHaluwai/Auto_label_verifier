@@ -1,11 +1,10 @@
 from fastapi import FastAPI, UploadFile
 from PIL import Image
 import io
-
 from detector import detect
 from critique import critique
 from calibration_loader import calibrate_score
-from nms import fuse_detections
+from nms import refining_nms
 
 app = FastAPI()
 
@@ -19,29 +18,90 @@ async def process(file: UploadFile):
 
     image = Image.open(io.BytesIO(await file.read())).convert("RGB")
     detections = detect(image)
+
     raw_by_model = {}
     calibrated_by_model = {}
 
+    # ----------------------------------------
+    # Separate raw & calibrated
+    # ----------------------------------------
     for det in detections:
+
         model_name = det["model"]
-        if model_name not in raw_by_model:
-            raw_by_model[model_name] = []
-            calibrated_by_model[model_name] = []
+
+        raw_by_model.setdefault(model_name, [])
+        calibrated_by_model.setdefault(model_name, [])
+
         raw_by_model[model_name].append(det)
+
         calibrated_score = calibrate_score(
             model_name,
             det["category"],
             det["score"]
         )
+
         calibrated_by_model[model_name].append({
             **det,
             "calibrated_score": float(calibrated_score)
         })
-    return {
-        "raw_detections": raw_by_model,
-        "calibrated_detections": calibrated_by_model
-    }
 
+    # ----------------------------------------
+    # Single-model refining NMS
+    # ----------------------------------------
+    raw_refined_single = {}
+    calibrated_refined_single = {}
+
+    for model in raw_by_model:
+
+        raw_refined_single[model] = refining_nms(
+            raw_by_model[model],
+            score_key="score",
+            iou_threshold=0.5,
+            output_model_name=model
+        )
+
+        calibrated_refined_single[model] = refining_nms(
+            calibrated_by_model[model],
+            score_key="calibrated_score",
+            iou_threshold=0.5,
+            output_model_name=model
+        )
+
+    # ----------------------------------------
+    # Cross-model refining NMS
+    # ----------------------------------------
+    all_raw = []
+    all_calibrated = []
+
+    for model in raw_by_model:
+        all_raw.extend(raw_by_model[model])
+        all_calibrated.extend(calibrated_by_model[model])
+
+    raw_refined_cross = refining_nms(
+        all_raw,
+        score_key="score",
+        iou_threshold=0.5,
+        output_model_name="ensemble"
+    )
+
+    calibrated_refined_cross = refining_nms(
+        all_calibrated,
+        score_key="calibrated_score",
+        iou_threshold=0.5,
+        output_model_name="ensemble"
+    )
+
+    # ----------------------------------------
+    # Return Everything (UI-compatible)
+    # ----------------------------------------
+    return {
+        "raw": raw_by_model,
+        "raw_refined_single": raw_refined_single,
+        "raw_refined_cross": raw_refined_cross,
+        "calibrated": calibrated_by_model,
+        "calibrated_refined_single": calibrated_refined_single,
+        "calibrated_refined_cross": calibrated_refined_cross
+    }
 
 
 
