@@ -9,6 +9,11 @@ services:
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
+      - HTTP_PROXY=
+      - HTTPS_PROXY=
+      - NO_PROXY=api,localhost,127.0.0.1
+      - no_proxy=api,localhost,127.0.0.1
+    command: uvicorn api:app --host 0.0.0.0 --port 8000
     deploy:
       resources:
         reservations:
@@ -24,3 +29,8 @@ services:
       - "8501:8501"
     depends_on:
       - api
+    environment:
+      - HTTP_PROXY=
+      - HTTPS_PROXY=
+      - NO_PROXY=api,localhost,127.0.0.1
+      - no_proxy=api,localhost,127.0.0.1

@@ -1,21 +1,20 @@
-# calibration_loader.py
-
 import joblib
 import os
 
 CALIBRATION_DIR = "models/calibrations"
 cache = {}
 
-def calibrate_score(model_name, cls, score):
-
-    key = f"{model_name}_{cls}"
-
-    if key not in cache:
-        path = os.path.join(CALIBRATION_DIR, f"{key}.pkl")
+def load_calibrator(model_name):
+    if model_name not in cache:
+        path = os.path.join(CALIBRATION_DIR, f"{model_name}.pkl")
         if os.path.exists(path):
-            cache[key] = joblib.load(path)
+            cache[model_name] = joblib.load(path)
         else:
-            return score  # fallback if no calibrator
+            raise ValueError(f"Calibrator for model {model_name} not found.")
+    return cache[model_name]
 
-    calibrator = cache[key]
-    return calibrator.predict([score])[0]
+def calibrate_score(model_name, category, score):
+    calibrator = load_calibrator(model_name)
+    if category not in calibrator:
+        return score
+    return calibrator[category].predict([[score]])[0]
